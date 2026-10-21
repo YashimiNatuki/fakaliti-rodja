@@ -1,28 +1,37 @@
-# Fakaliti Rodja Graveyard v4.2.1
+# Fakaliti Rodja Graveyard v4.3 — GAME CHANGER
 
-Full production Electron + React + Three.js holographic desktop companion.
+Electron + React + Three.js holographic desktop companion.
 
-## Features
-- Leteći Rođa (transparent always-on-top canvas avatar + chat + mood)
-- 3D Y!App Graveyard with live GitHub repos (YashimiNatuki)
-- Dual chat persistence (IndexedDB + encrypted electron-store)
-- Local Ollama integration
-- Single instance lock, system tray
-- High performance R3F scene (stars, particles, fog, emissive monoliths)
+## What's new in v4.3
+- **Terminal tool** inside Rođa (xterm.js + real shell via Electron spawn)
+- Multi-tab UX: CHAT · TERM · TOOLS · SYS
+- System info live (CPU, mem, load, uptime)
+- Quick tools: uptime, ls, node/npm, git status, ollama check
+- Command history (↑↓) in terminal
+- Dangerous command blocklist
+- Graveyard: search + status filters + detail panel + selection glow
+- More data on repos, better algorithms for layout & emissive
 
 ## Quick start
 ```bash
+git clone https://github.com/YashimiNatuki/fakaliti-rodja.git
+cd fakaliti-rodja
 npm install
 npm run dev
 ```
 
-## Build portable EXE
+## Build
 ```bash
 npm run build
 ```
 
 ## Requirements
 - Node 20+
-- Ollama running locally (optional but recommended)
+- Ollama (optional): `ollama serve && ollama pull llama3.2:latest`
 
-Repo: https://github.com/YashimiNatuki/fakaliti-rodja
+## Architecture
+- `electron/main.js` — IPC: chat, ollama, shell:exec, system:info
+- `src/Rodja.tsx` — floating multi-tab companion
+- `src/Terminal.tsx` — xterm + history + color
+- `src/Graveyard.tsx` — 3D monoliths + filters + detail
+- Dual persistence (IndexedDB + encrypted electron-store)
