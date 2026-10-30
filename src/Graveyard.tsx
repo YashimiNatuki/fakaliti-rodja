@@ -2,6 +2,7 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Float, Text, Stars } from '@react-three/drei';
 import { useMemo, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
+import { invoke } from './api';
 
 type Status = 'immortal' | 'infected' | 'buried';
 
@@ -137,12 +138,8 @@ export default function Graveyard() {
   }, [filtered]);
 
   const openRepo = useCallback((name: string) => {
-    try {
-      const { ipcRenderer } = (window as any).require('electron');
-      ipcRenderer.invoke('shell:open', `https://github.com/YashimiNatuki/${name}`);
-    } catch {
-      window.open(`https://github.com/YashimiNatuki/${name}`, '_blank');
-    }
+    const url = `https://github.com/YashimiNatuki/${name}`;
+    invoke('shell:open', url).catch(() => window.open(url, '_blank'));
   }, []);
 
   const counts = useMemo(() => ({

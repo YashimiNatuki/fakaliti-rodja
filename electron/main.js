@@ -1,12 +1,41 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, shell, nativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, shell, nativeImage, safeStorage, session } from 'electron';
 import path from 'path';
+import fs from 'fs';
+import crypto from 'crypto';
+import net from 'net';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import os from 'os';
 import Store from 'electron-store';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const store = new Store({ name: 'fakaliti-v43', encryptionKey: 'fakaliti-rodja-secure-2026' });
+
+// ---- store key: random per install, sealed by the OS keychain when available ----
+function loadStoreKey() {
+  const f = path.join(app.getPath('userData'), 'store.key');
+  try {
+    const raw = fs.readFileSync(f);
+    return safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(raw) : raw.toString('utf8');
+  } catch { /* first run */ }
+  const key = crypto.randomBytes(32).toString('hex');
+  const out = safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(key) : Buffer.from(key);
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  fs.writeFileSync(f, out, { mode: 0o600 });
+  return key;
+}
+
+let store = null;
+function initStore() {
+  store = new Store({ name: 'fakaliti-v5', encryptionKey: loadStoreKey() });
+  // one-time migration from v4.3, which used a key hardcoded in the (public) repo
+  if (!store.has('messages')) {
+    try {
+      const old = new Store({ name: 'fakaliti-v43', encryptionKey: 'fakaliti-rodja-secure-2026' });
+      const msgs = old.get('messages');
+      if (Array.isArray(msgs) && msgs.length) store.set('messages', msgs);
+    } catch { /* nothing to migrate */ }
+  }
+}
 
 let rodjaWin = null;
 let graveyardWin = null;
@@ -25,6 +54,34 @@ if (!gotLock) {
   });
 }
 
+const isHttp = (u) => {
+  try { const p = new URL(u).protocol; return p === 'http:' || p === 'https:'; } catch { return false; }
+};
+
+function hardenWindow(win) {
+  // never let a link/markdown/result navigate the app window; open http(s) in the OS browser
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (isHttp(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  win.webContents.on('will-navigate', (e, url) => {
+    const cur = win.webContents.getURL().split('#')[0];
+    if (url.split('#')[0] !== cur) {
+      e.preventDefault();
+      if (isHttp(url)) shell.openExternal(url);
+    }
+  });
+}
+
+const webPreferences = {
+  preload: path.join(__dirname, 'preload.cjs'),
+  contextIsolation: true,
+  nodeIntegration: false,
+  sandbox: true,
+  webSecurity: true,
+  backgroundThrottling: false
+};
+
 function createRodja() {
   if (rodjaWin) {
     rodjaWin.show();
@@ -32,23 +89,19 @@ function createRodja() {
     return;
   }
   rodjaWin = new BrowserWindow({
-    width: 340,
-    height: 560,
+    width: 360,
+    height: 640,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: true,
-    minWidth: 300,
-    minHeight: 400,
+    minWidth: 320,
+    minHeight: 420,
     hasShadow: false,
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      webSecurity: false,
-      backgroundThrottling: false
-    }
+    webPreferences
   });
+  hardenWindow(rodjaWin);
 
   const isDev = !!process.env.VITE_DEV;
   const url = isDev
@@ -69,12 +122,9 @@ function createGraveyard() {
     height: 960,
     frame: false,
     backgroundColor: '#000000',
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      backgroundThrottling: false
-    }
+    webPreferences
   });
+  hardenWindow(graveyardWin);
 
   const isDev = !!process.env.VITE_DEV;
   const url = isDev
@@ -86,13 +136,14 @@ function createGraveyard() {
 }
 
 app.whenReady().then(() => {
+  initStore();
   createRodja();
 
   const icon = nativeImage.createFromDataURL(
     'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgdmlld0JveD0iMCAwIDMyIDMyIj48Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIxNCIgZmlsbD0iIzAwZmZjYyIvPjx0ZXh0IHg9IjE2IiB5PSIyMSIgZm9udC1zaXplPSIxNCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iIzAwMCI+UjwvdGV4dD48L3N2Zz4='
   );
   tray = new Tray(icon);
-  tray.setToolTip('Fakaliti Rodja v4.3');
+  tray.setToolTip('Fakaliti Rodja v5.0');
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Prikaži Rođu', click: () => createRodja() },
     { label: 'Graveyard 3D', click: () => createGraveyard() },
@@ -101,14 +152,14 @@ app.whenReady().then(() => {
   ]));
 });
 
-// Chat persistence
-ipcMain.handle('chat:get', () => store.get('messages', []));
+// ---- Chat persistence ----
+ipcMain.handle('chat:get', () => (store ? store.get('messages', []) : []));
 ipcMain.handle('chat:save', (_e, data) => {
-  store.set('messages', data);
+  if (store && Array.isArray(data)) store.set('messages', data.slice(-500));
   return true;
 });
 
-// Ollama
+// ---- Ollama ----
 ipcMain.handle('ollama:chat', async (_e, payload) => {
   try {
     const controller = new AbortController();
@@ -131,13 +182,12 @@ ipcMain.handle('ollama:chat', async (_e, payload) => {
   }
 });
 
-// Real shell exec (safe whitelist + free form)
+// ---- Real shell exec (blocklist is a speed bump, not a sandbox: this is the owner's own box) ----
 ipcMain.handle('shell:exec', async (_e, cmd) => {
   return new Promise((resolve) => {
     const safe = String(cmd || '').trim();
     if (!safe) return resolve({ ok: false, out: 'empty command' });
 
-    // block dangerous patterns
     const blocked = /(rm\s+-rf|format|mkfs|dd\s+if=|shutdown|reboot|passwd|chmod\s+777|curl.*\|.*sh)/i;
     if (blocked.test(safe)) {
       return resolve({ ok: false, out: 'BLOCKED: dangerous command pattern' });
@@ -162,7 +212,27 @@ ipcMain.handle('shell:exec', async (_e, cmd) => {
   });
 });
 
-// System info algorithm
+// ---- System info (+ real CPU% from cpu time deltas, works on Windows where loadavg is 0) ----
+let prevCpu = null;
+function cpuPercent() {
+  const cur = os.cpus().reduce((a, c) => {
+    const t = c.times;
+    a.idle += t.idle;
+    a.total += t.user + t.nice + t.sys + t.idle + t.irq;
+    return a;
+  }, { idle: 0, total: 0 });
+  let pct = 0;
+  if (prevCpu) {
+    const dTotal = cur.total - prevCpu.total;
+    const dIdle = cur.idle - prevCpu.idle;
+    pct = dTotal > 0 ? Math.round((1 - dIdle / dTotal) * 1000) / 10 : 0;
+  }
+  prevCpu = cur;
+  return pct;
+}
+
+cpuPercent(); // prime the counter so the first real sample is a true delta, not 0
+
 ipcMain.handle('system:info', () => {
   const cpus = os.cpus();
   const load = os.loadavg();
@@ -177,6 +247,7 @@ ipcMain.handle('system:info', () => {
     model: cpus[0]?.model || 'unknown',
     load1: load[0]?.toFixed(2),
     load5: load[1]?.toFixed(2),
+    cpuPct: cpuPercent(),
     memTotal: Math.round(totalMem / 1024 / 1024),
     memFree: Math.round(freeMem / 1024 / 1024),
     memUsedPct: Math.round(((totalMem - freeMem) / totalMem) * 100),
@@ -185,9 +256,63 @@ ipcMain.handle('system:info', () => {
   };
 });
 
-ipcMain.handle('shell:open', (_e, url) => shell.openExternal(url));
+// only http(s): shell.openExternal on arbitrary schemes (file:, ms-*:, custom) is a known RCE vector
+ipcMain.handle('shell:open', (_e, url) => {
+  if (!isHttp(url)) return false;
+  return shell.openExternal(url).then(() => true);
+});
 ipcMain.on('ui:graveyard', () => createGraveyard());
 ipcMain.on('ui:rodja', () => createRodja());
+
+// ---- Tor (YappinaTor): the user's own local Tor daemon / Tor Browser SOCKS5 ----
+const TOR_HOST = '127.0.0.1';
+const TOR_PORTS = [9050, 9150]; // tor daemon, Tor Browser
+let torPort = null;
+
+function probe(port) {
+  return new Promise((resolve) => {
+    const s = net.connect({ host: TOR_HOST, port, timeout: 1500 });
+    s.once('connect', () => { s.destroy(); resolve(true); });
+    s.once('timeout', () => { s.destroy(); resolve(false); });
+    s.once('error', () => resolve(false));
+  });
+}
+
+async function findTor() {
+  for (const p of TOR_PORTS) if (await probe(p)) return (torPort = p);
+  return (torPort = null);
+}
+
+ipcMain.handle('tor:status', async () => {
+  const port = await findTor();
+  return { up: port !== null, port };
+});
+
+ipcMain.handle('tor:fetch', async (_e, url) => {
+  if (!isHttp(url) || String(url).length > 2048) return { ok: false, status: 0, body: 'bad url' };
+  const port = torPort ?? (await findTor());
+  if (!port) return { ok: false, status: 0, body: 'Tor nije pokrenut (nema SOCKS5 na 127.0.0.1:9050/9150). Pokreni tor ili Tor Browser.' };
+
+  // Dedicated session. A single socks5 rule means NO fallback to a direct connection,
+  // and Chromium hands the hostname to the proxy (remote DNS), so .onion resolves and nothing leaks.
+  const ses = session.fromPartition('persist:tor');
+  await ses.setProxy({ proxyRules: `socks5://${TOR_HOST}:${port}` });
+
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 60000);
+  try {
+    const res = await ses.fetch(url, {
+      signal: ctl.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; rv:128.0) Gecko/20100101 Firefox/128.0' }
+    });
+    const body = (await res.text()).slice(0, 1_500_000);
+    return { ok: res.ok, status: res.status, body };
+  } catch (err) {
+    return { ok: false, status: 0, body: `Tor fetch fail: ${String(err.message || err)}` };
+  } finally {
+    clearTimeout(t);
+  }
+});
 
 app.on('window-all-closed', (e) => e.preventDefault());
 app.on('activate', () => createRodja());

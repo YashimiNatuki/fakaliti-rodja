@@ -3,6 +3,7 @@ import { Terminal } from 'xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import 'xterm/css/xterm.css';
+import { invoke } from './api';
 
 interface Props {
   height?: number;
@@ -59,8 +60,7 @@ export default function TermPanel({ height = 220 }: Props) {
       histIdx.current = -1;
 
       try {
-        const { ipcRenderer } = (window as any).require('electron');
-        const res = await ipcRenderer.invoke('shell:exec', cmd);
+        const res = await invoke('shell:exec', cmd);
         term.write('\r\n');
         if (res.out) {
           // colorize simple

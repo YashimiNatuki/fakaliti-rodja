@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { openDB, IDBPDatabase } from 'idb';
+import { invoke } from './api';
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -40,10 +41,9 @@ const electronStorage = {
     const db = await getDB();
     await db.put('chat', value, name);
     try {
-      const { ipcRenderer } = (window as any).require('electron');
       const parsed = JSON.parse(value);
-      await ipcRenderer.invoke('chat:save', parsed.state.messages);
-    } catch {}
+      await invoke('chat:save', parsed.state.messages);
+    } catch { /* browser mode: IndexedDB only */ }
   },
   removeItem: async (name: string): Promise<void> => {
     const db = await getDB();
@@ -66,16 +66,14 @@ export const useChatStore = create<ChatState>()(
       },
       loadFromElectron: async () => {
         try {
-          const { ipcRenderer } = (window as any).require('electron');
-          const hist = await ipcRenderer.invoke('chat:get');
+          const hist = await invoke('chat:get');
           if (Array.isArray(hist) && hist.length) set({ messages: hist });
-        } catch {}
+        } catch { /* no bridge */ }
       },
       persistToElectron: async () => {
         try {
-          const { ipcRenderer } = (window as any).require('electron');
-          await ipcRenderer.invoke('chat:save', get().messages);
-        } catch {}
+          await invoke('chat:save', get().messages);
+        } catch { /* no bridge */ }
       }
     }),
     {
