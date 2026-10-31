@@ -12,6 +12,15 @@ Electron + React + Three.js holographic desktop companion (Leteći Rođa) + 3D G
 | TOOLS | Brze provere: uptime, ls, node, git, ollama. |
 | SYS | Telemetrija: `Z = (X − μ) / σ` nad kliznim prozorom od 60 uzoraka za CPU% i MEM%. `|Z| > 2` posle warmup-a = `ANOMALY_DETECTED` (crveni puls). |
 
+## Prečice
+| Taster | Akcija |
+|---|---|
+| Ctrl+1 do Ctrl+6 | Chat, Yotes, Dork, Term, Alati, Sys |
+| Ctrl+L | Zaključaj sef |
+| Esc | Zatvori Graveyard |
+
+Statusna linija u headeru uvek pokazuje Ollama, Tor i stanje sefa. Kad telemetrija javi anomaliju, okvir i oči avatara postaju crveni, a Sys tab dobija crvenu tačku. Pin dugme drži prozor na vrhu, a minus ga sakriva u tray (klik na tray ikonu ga vraća).
+
 ## Tor
 Treba tvoj lokalni Tor: tor daemon (`127.0.0.1:9050`) ili Tor Browser (`:9150`). Aplikacija ga sama pronađe. Zahtevi idu kroz poseban Electron session sa jednim `socks5://` pravilom: nema fallback-a na direktnu vezu, a hostname se rešava kroz proxy (remote DNS), pa se `.onion` rešava i DNS ne curi. Ahmia `.onion` host je polje u UI-ju (indeksi se menjaju).
 

@@ -1,8 +1,8 @@
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Float, Text, Stars } from '@react-three/drei';
-import { useMemo, useRef, useState, useCallback } from 'react';
+import { useMemo, useRef, useState, useCallback, useEffect } from 'react';
 import * as THREE from 'three';
-import { invoke } from './api';
+import { invoke, send } from './api';
 
 type Status = 'immortal' | 'infected' | 'buried';
 
@@ -137,6 +137,12 @@ export default function Graveyard() {
     });
   }, [filtered]);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') send('win:close'); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const openRepo = useCallback((name: string) => {
     const url = `https://github.com/YashimiNatuki/${name}`;
     invoke('shell:open', url).catch(() => window.open(url, '_blank'));
@@ -177,6 +183,15 @@ export default function Graveyard() {
           ))}
         </div>
       </div>
+
+      <button
+        onClick={() => send('win:close')}
+        aria-label="Zatvori Graveyard (Esc)"
+        title="Zatvori (Esc)"
+        className="absolute right-4 top-4 z-[60] h-8 w-8 rounded-md border border-cyan-700/50 bg-black/70 font-mono text-sm text-cyan-300 hover:border-red-500 hover:text-red-400"
+      >
+        ✕
+      </button>
 
       {/* Bottom stats */}
       <div className="absolute bottom-4 left-4 z-50 font-mono text-xs text-cyan-600/80 pointer-events-none">

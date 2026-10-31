@@ -6,7 +6,7 @@ import 'xterm/css/xterm.css';
 import { invoke } from './api';
 
 interface Props {
-  height?: number;
+  height?: number | string;
 }
 
 export default function TermPanel({ height = 220 }: Props) {
@@ -22,16 +22,21 @@ export default function TermPanel({ height = 220 }: Props) {
 
     const term = new Terminal({
       theme: {
-        background: '#05050c',
-        foreground: '#00ffcc',
-        cursor: '#ff00aa',
-        selectionBackground: '#ff00aa44',
-        black: '#000',
-        brightCyan: '#00ffcc',
-        brightMagenta: '#ff00aa'
+        background: '#0d121d',
+        foreground: '#d8e3f2',
+        cursor: '#ff3da6',
+        selectionBackground: '#ff3da644',
+        black: '#070a12',
+        red: '#ff4d5e',
+        green: '#19f0d0',
+        yellow: '#ffb020',
+        cyan: '#19f0d0',
+        magenta: '#ff3da6',
+        brightCyan: '#19f0d0',
+        brightMagenta: '#ff3da6'
       },
-      fontSize: 12,
-      fontFamily: 'JetBrains Mono, Fira Code, monospace',
+      fontSize: 13,
+      fontFamily: '"JetBrains Mono Variable", "JetBrains Mono", Consolas, monospace',
       cursorBlink: true,
       convertEol: true,
       rows: 12,
@@ -47,7 +52,7 @@ export default function TermPanel({ height = 220 }: Props) {
     fitRef.current = fit;
     termRef.current = term;
 
-    term.writeln('\x1b[36mFAKALITI SHELL v4.3\x1b[0m — type commands, ↑↓ history');
+    term.writeln('\x1b[36mFAKALITI SHELL v5.0\x1b[0m: komande, ↑↓ istorija');
     term.write('\x1b[35mroot@fakaliti\x1b[0m:\x1b[36m~\x1b[0m$ ');
 
     const run = async (cmd: string) => {
@@ -118,20 +123,18 @@ export default function TermPanel({ height = 220 }: Props) {
       }
     });
 
-    const onResize = () => fit.fit();
-    window.addEventListener('resize', onResize);
+    const ro = new ResizeObserver(() => { try { fit.fit(); } catch { /* hidden */ } });
+    ro.observe(containerRef.current);
     return () => {
-      window.removeEventListener('resize', onResize);
+      ro.disconnect();
       term.dispose();
       termRef.current = null;
     };
   }, []);
 
   return (
-    <div
-      ref={containerRef}
-      style={{ height, width: '100%' }}
-      className="rounded border border-cyan-800/50 overflow-hidden"
-    />
+    <div style={{ height, width: '100%' }} className="overflow-hidden rounded-md border border-line bg-surface p-2">
+      <div ref={containerRef} className="h-full w-full" />
+    </div>
   );
 }

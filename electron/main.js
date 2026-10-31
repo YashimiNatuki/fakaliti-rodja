@@ -89,15 +89,15 @@ function createRodja() {
     return;
   }
   rodjaWin = new BrowserWindow({
-    width: 360,
-    height: 640,
+    width: 400,
+    height: 700,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: true,
-    minWidth: 320,
-    minHeight: 420,
+    minWidth: 340,
+    minHeight: 480,
     hasShadow: false,
     webPreferences
   });
@@ -144,6 +144,7 @@ app.whenReady().then(() => {
   );
   tray = new Tray(icon);
   tray.setToolTip('Fakaliti Rodja v5.0');
+  tray.on('click', () => createRodja());
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Prikaži Rođu', click: () => createRodja() },
     { label: 'Graveyard 3D', click: () => createGraveyard() },
@@ -262,6 +263,29 @@ ipcMain.handle('shell:open', (_e, url) => {
   return shell.openExternal(url).then(() => true);
 });
 ipcMain.on('ui:graveyard', () => createGraveyard());
+
+// ---- window controls (frameless windows have none) ----
+const winOf = (e) => BrowserWindow.fromWebContents(e.sender);
+ipcMain.on('win:hide', (e) => winOf(e)?.hide());
+ipcMain.on('win:close', (e) => winOf(e)?.close());
+ipcMain.handle('win:pin', (e, toggle) => {
+  const w = winOf(e);
+  if (!w) return false;
+  if (toggle) w.setAlwaysOnTop(!w.isAlwaysOnTop());
+  return w.isAlwaysOnTop();
+});
+
+ipcMain.handle('ollama:status', async () => {
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 1500);
+    const r = await fetch('http://127.0.0.1:11434/api/tags', { signal: ctl.signal });
+    clearTimeout(t);
+    return { up: r.ok };
+  } catch {
+    return { up: false };
+  }
+});
 ipcMain.on('ui:rodja', () => createRodja());
 
 // ---- Tor (YappinaTor): the user's own local Tor daemon / Tor Browser SOCKS5 ----

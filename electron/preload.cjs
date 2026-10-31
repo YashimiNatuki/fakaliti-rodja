@@ -3,9 +3,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const INVOKE = new Set([
   'chat:get', 'chat:save', 'ollama:chat', 'shell:exec', 'system:info', 'shell:open',
-  'tor:status', 'tor:fetch'
+  'tor:status', 'tor:fetch', 'ollama:status', 'win:pin'
 ]);
-const SEND = new Set(['ui:graveyard', 'ui:rodja']);
+const SEND = new Set(['ui:graveyard', 'ui:rodja', 'win:hide', 'win:close']);
 
 contextBridge.exposeInMainWorld('fk', {
   invoke: (ch, ...args) => {

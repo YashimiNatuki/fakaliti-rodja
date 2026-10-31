@@ -13,6 +13,7 @@
     "build:web": "tsc --noEmit && vite build"
   },
   "dependencies": {
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@react-three/drei": "^9.117.3",
     "@react-three/fiber": "^8.17.10",
     "@xterm/addon-fit": "^0.10.0",

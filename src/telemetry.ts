@@ -7,15 +7,18 @@ export interface Telemetry {
   info: any | null;
   cpu: Reading | null;
   mem: Reading | null;
+  cpuH: Reading[]; // last 60 scored samples, for the sparkline
+  memH: Reading[];
   anomaly: boolean;
 }
 
-const EMPTY: Telemetry = { info: null, cpu: null, mem: null, anomaly: false };
+const EMPTY: Telemetry = { info: null, cpu: null, mem: null, cpuH: [], memH: [], anomaly: false };
+const KEEP = 60;
 
 export function useTelemetry(active: boolean, intervalMs = 2000): Telemetry {
   const [t, setT] = useState<Telemetry>(EMPTY);
-  const cpuW = useRef(new Rolling(60));
-  const memW = useRef(new Rolling(60));
+  const cpuW = useRef(new Rolling(KEEP));
+  const memW = useRef(new Rolling(KEEP));
 
   useEffect(() => {
     if (!active) return;
@@ -26,7 +29,12 @@ export function useTelemetry(active: boolean, intervalMs = 2000): Telemetry {
         if (!alive) return;
         const cpu = evaluate(cpuW.current, info.cpuPct, { threshold: 2, sdFloor: 2 });
         const mem = evaluate(memW.current, info.memUsedPct, { threshold: 2, sdFloor: 0.5 });
-        setT({ info, cpu, mem, anomaly: cpu.anomaly || mem.anomaly });
+        setT(prev => ({
+          info, cpu, mem,
+          cpuH: [...prev.cpuH, cpu].slice(-KEEP),
+          memH: [...prev.memH, mem].slice(-KEEP),
+          anomaly: cpu.anomaly || mem.anomaly
+        }));
       } catch { /* no bridge */ }
     };
     tick();

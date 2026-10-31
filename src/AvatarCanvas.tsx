@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react';
 
 interface Props {
-  size?: number;
+  size?: number; // internal drawing resolution
+  display?: number; // CSS pixels; defaults to size
   mood?: 'idle' | 'talk' | 'think';
+  alert?: boolean; // eyes + halo go red on telemetry anomaly
 }
 
-export default function AvatarCanvas({ size = 170, mood = 'idle' }: Props) {
+export default function AvatarCanvas({ size = 170, display, mood = 'idle', alert = false }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const raf = useRef(0);
 
@@ -13,6 +15,9 @@ export default function AvatarCanvas({ size = 170, mood = 'idle' }: Props) {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext('2d')!;
     let t = 0;
+    const eye = alert ? '#ff4d5e' : '#00ffcc';
+    const halo = alert ? 'rgba(255,77,94,0.22)' : 'rgba(0,255,204,0.18)';
+    const rim = alert ? 'rgba(255,77,94,0.55)' : 'rgba(0,255,204,0.4)';
 
     const particles: { x: number; y: number; vx: number; vy: number; life: number }[] = [];
     for (let i = 0; i < 22; i++) {
@@ -30,7 +35,7 @@ export default function AvatarCanvas({ size = 170, mood = 'idle' }: Props) {
       ctx.clearRect(0, 0, size, size);
 
       const grd = ctx.createRadialGradient(size / 2, size / 2, 8, size / 2, size / 2, size * 0.58);
-      grd.addColorStop(0, 'rgba(0,255,204,0.18)');
+      grd.addColorStop(0, halo);
       grd.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = grd;
       ctx.fillRect(0, 0, size, size);
@@ -40,13 +45,13 @@ export default function AvatarCanvas({ size = 170, mood = 'idle' }: Props) {
       ctx.ellipse(size / 2, size / 2 - 8, 58, 68, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.strokeStyle = 'rgba(0,255,204,0.4)';
+      ctx.strokeStyle = rim;
       ctx.lineWidth = 2.2;
       ctx.stroke();
 
       const eyePulse = mood === 'talk' ? 1.9 : mood === 'think' ? 0.7 : 1.25;
-      ctx.fillStyle = '#00ffcc';
-      ctx.shadowColor = '#00ffcc';
+      ctx.fillStyle = eye;
+      ctx.shadowColor = eye;
       ctx.shadowBlur = 14;
       ctx.beginPath();
       ctx.arc(size / 2 - 20, size / 2 - 18, 7 + Math.sin(t * 2.2) * eyePulse, 0, Math.PI * 2);
@@ -99,15 +104,16 @@ export default function AvatarCanvas({ size = 170, mood = 'idle' }: Props) {
 
     draw();
     return () => cancelAnimationFrame(raf.current);
-  }, [size, mood]);
+  }, [size, mood, alert]);
 
   return (
     <canvas
       ref={canvasRef}
       width={size}
       height={size}
-      className="rounded-full block mx-auto"
-      style={{ imageRendering: 'auto' }}
+      className="block rounded-full"
+      style={{ width: display ?? size, height: display ?? size }}
+      aria-hidden
     />
   );
 }
